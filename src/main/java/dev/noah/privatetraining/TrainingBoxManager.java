@@ -2,9 +2,11 @@ package dev.noah.privatetraining;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.plugin.Plugin;
 
@@ -14,9 +16,11 @@ public class TrainingBoxManager implements Listener {
 
     Plugin plugin;
     private final ArrayList<TrainingBox> trainingBoxes;
+    private World trainingWorld;
 
-    public TrainingBoxManager(Plugin plugin) {
+    public TrainingBoxManager(Plugin plugin, World trainingWorld) {
         this.plugin = plugin;
+        this.trainingWorld = trainingWorld;
         trainingBoxes = new ArrayList<>();
 
     }
@@ -38,11 +42,11 @@ public class TrainingBoxManager implements Listener {
         if (trainingBoxes.isEmpty()) {
             // Create the first training box at the spawn location.
             trainingBox = new TrainingBox(
-                    PrivateTraining.trainingWorld.getSpawnLocation().clone().add(-20, 10, -20),
-                    PrivateTraining.trainingWorld.getSpawnLocation().clone().add(20, 30, 20)
+                    trainingWorld.getSpawnLocation().clone().add(-20, 10, -20),
+                    trainingWorld.getSpawnLocation().clone().add(20, 30, 20)
             );
         } else {
-            int gridSpacing = 100; // Spacing between boxes in the grid
+            int gridSpacing = 256; // Spacing between boxes in the grid
             int gridSize = 5; // Number of boxes per row in the grid
 
             int boxIndex = trainingBoxes.size();
@@ -95,6 +99,12 @@ public class TrainingBoxManager implements Listener {
         return trainingBox;
     }
 
+    public void resetAllBoxes(){
+        for(TrainingBox trainingBox : trainingBoxes){
+            trainingBox.resetBox();
+        }
+    }
+
 
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
@@ -105,10 +115,31 @@ public class TrainingBoxManager implements Listener {
 
         for (TrainingBox trainingBox : trainingBoxes) {
             if (trainingBox.isInBox(player.getLocation())) {
+                player.spigot().respawn();
                 player.teleport(trainingBox.getSpawnpoint());
                 return;
             }
         }
     }
+
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent event) {
+
+        if(event.getBlock().getWorld()!=trainingWorld){
+            return;
+        }
+
+        for (TrainingBox trainingBox : trainingBoxes) {
+            if (trainingBox.isInBox(event.getBlock().getLocation())) {
+                if(!PrivateTraining.trainingBlocks.contains(event.getBlock().getType())){
+                    event.setCancelled(true);
+                    return;
+                }
+                return;
+            }
+        }
+    }
+
+
 
 }
