@@ -1,0 +1,11 @@
+name: PrivateTraining
+version: '${project.version}'
+main: dev.noah.privatetraining.PrivateTraining
+api-version: '1.19'
+
+commands:
+  train:
+    description: Start a training session
+    usage: /<command>
+    permission: privatetraining.train
+    aliases: [privatebox]
