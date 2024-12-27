@@ -1,10 +1,15 @@
 package dev.noah.privatetraining;
 
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 
 public record TrainingBox(Location corner1, Location corner2) {
@@ -77,8 +82,6 @@ public record TrainingBox(Location corner1, Location corner2) {
     }
 
     public void resetBox() {
-        corner1.getWorld().getNearbyEntities(BoundingBox.of(corner1, corner2)).stream().filter(entity -> !(entity instanceof Player)).filter(player -> !player.hasMetadata("NPC")).forEach(Entity::remove);
-
         for (int x = corner1.getBlockX(); x <= corner2.getBlockX(); x++) {
             for (int y = corner1.getBlockY(); y <= corner2.getBlockY(); y++) {
                 for (int z = corner1.getBlockZ(); z <= corner2.getBlockZ(); z++) {
@@ -89,6 +92,9 @@ public record TrainingBox(Location corner1, Location corner2) {
                 }
             }
         }
+
+        corner1.getWorld().getNearbyEntities(BoundingBox.of(corner1, corner2)).stream().filter(entity -> !(entity instanceof Player)).filter(player -> !player.hasMetadata("NPC")).forEach(Entity::remove);
+
 
     }
 
