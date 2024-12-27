@@ -1,27 +1,33 @@
 package dev.noah.privatetraining;
 
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class TrainingBoxManager implements Listener {
 
-    Plugin plugin;
     private final ArrayList<TrainingBox> trainingBoxes;
-    private World trainingWorld;
+    private final HashMap<Player, TrainingBox> respawnMap;
+    private final World trainingWorld;
+    private final World spawnWorld;
+    Plugin plugin;
 
-    public TrainingBoxManager(Plugin plugin, World trainingWorld) {
+    public TrainingBoxManager(Plugin plugin, World trainingWorld, World spawnWorld) {
         this.plugin = plugin;
         this.trainingWorld = trainingWorld;
+        this.spawnWorld = spawnWorld;
         trainingBoxes = new ArrayList<>();
+        respawnMap = new HashMap<>();
 
     }
 
@@ -41,10 +47,7 @@ public class TrainingBoxManager implements Listener {
 
         if (trainingBoxes.isEmpty()) {
             // Create the first training box at the spawn location.
-            trainingBox = new TrainingBox(
-                    trainingWorld.getSpawnLocation().clone().add(-20, 10, -20),
-                    trainingWorld.getSpawnLocation().clone().add(20, 30, 20)
-            );
+            trainingBox = new TrainingBox(trainingWorld.getSpawnLocation().clone().add(-20, 10, -20), trainingWorld.getSpawnLocation().clone().add(20, 30, 20));
         } else {
             int gridSpacing = 256; // Spacing between boxes in the grid
             int gridSize = 5; // Number of boxes per row in the grid
@@ -54,8 +57,8 @@ public class TrainingBoxManager implements Listener {
             int col = boxIndex % gridSize;
 
             // Calculate the new positions based on the grid
-            Location lastCorner1 = trainingBoxes.get(0).getCorner1(); // Use the first box as a reference
-            Location lastCorner2 = trainingBoxes.get(0).getCorner2();
+            Location lastCorner1 = trainingBoxes.get(0).corner1(); // Use the first box as a reference
+            Location lastCorner2 = trainingBoxes.get(0).corner2();
 
             Location newCorner1 = lastCorner1.clone().add(col * gridSpacing, 0, row * gridSpacing);
             Location newCorner2 = lastCorner2.clone().add(col * gridSpacing, 0, row * gridSpacing);
@@ -65,33 +68,6 @@ public class TrainingBoxManager implements Listener {
 
         trainingBoxes.add(trainingBox);
 
-        //fill a floor at the bottom of the box with grass_block
-        int y = trainingBox.getCorner1().getBlockY();
-        for (int x = trainingBox.getCorner1().getBlockX(); x <= trainingBox.getCorner2().getBlockX(); x++) {
-            for (int z = trainingBox.getCorner1().getBlockZ(); z <= trainingBox.getCorner2().getBlockZ(); z++) {
-                trainingBox.getCorner1().getWorld().getBlockAt(x, y, z).setType(Material.GRASS_BLOCK);
-            }
-        }
-
-        //fill walls with glass
-        for (int x = trainingBox.getCorner1().getBlockX(); x <= trainingBox.getCorner2().getBlockX(); x++) {
-            for (int y1 = trainingBox.getCorner1().getBlockY() + 1; y1 <= trainingBox.getCorner1().getBlockY() + 10; y1++) {
-                if(!(trainingBox.getCorner1().getWorld().getBlockAt(x, y1, trainingBox.getCorner1().getBlockZ()).getType()==Material.TINTED_GLASS))
-                trainingBox.getCorner1().getWorld().getBlockAt(x, y1, trainingBox.getCorner1().getBlockZ()).setType(Material.TINTED_GLASS);
-                if(!(trainingBox.getCorner1().getWorld().getBlockAt(x, y1, trainingBox.getCorner2().getBlockZ()).getType()==Material.TINTED_GLASS))
-                trainingBox.getCorner1().getWorld().getBlockAt(x, y1, trainingBox.getCorner2().getBlockZ()).setType(Material.TINTED_GLASS);
-            }
-        }
-
-        for (int z = trainingBox.getCorner1().getBlockZ(); z <= trainingBox.getCorner2().getBlockZ(); z++) {
-            for (int y1 = trainingBox.getCorner1().getBlockY() + 1; y1 <= trainingBox.getCorner1().getBlockY() + 10; y1++) {
-
-                if(!(trainingBox.getCorner1().getWorld().getBlockAt(trainingBox.getCorner1().getBlockX(), y1, z).getType()==Material.TINTED_GLASS))
-                trainingBox.getCorner1().getWorld().getBlockAt(trainingBox.getCorner1().getBlockX(), y1, z).setType(Material.TINTED_GLASS);
-                if(!(trainingBox.getCorner1().getWorld().getBlockAt(trainingBox.getCorner2().getBlockX(), y1, z).getType()==Material.TINTED_GLASS))
-                trainingBox.getCorner1().getWorld().getBlockAt(trainingBox.getCorner2().getBlockX(), y1, z).setType(Material.TINTED_GLASS);
-            }
-        }
 
         trainingBox.resetBox();
 
@@ -99,8 +75,8 @@ public class TrainingBoxManager implements Listener {
         return trainingBox;
     }
 
-    public void resetAllBoxes(){
-        for(TrainingBox trainingBox : trainingBoxes){
+    public void resetAllBoxes() {
+        for (TrainingBox trainingBox : trainingBoxes) {
             trainingBox.resetBox();
         }
     }
@@ -115,9 +91,26 @@ public class TrainingBoxManager implements Listener {
 
         for (TrainingBox trainingBox : trainingBoxes) {
             if (trainingBox.isInBox(player.getLocation())) {
-                player.spigot().respawn();
-                player.teleport(trainingBox.getSpawnpoint());
+                respawnMap.put(player, trainingBox);
                 return;
+            }
+        }
+    }
+
+    @EventHandler
+    public void playerSpawnEvent(PlayerRespawnEvent event) {
+        if (respawnMap.containsKey(event.getPlayer())) {
+            event.setRespawnLocation(respawnMap.get(event.getPlayer()).getSpawnLocation());
+            respawnMap.remove(event.getPlayer());
+        }
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        for (TrainingBox trainingBox : trainingBoxes) {
+            if (trainingBox.isInBox(player.getLocation())) {
+                player.teleport(spawnWorld.getSpawnLocation());
             }
         }
     }
@@ -125,13 +118,13 @@ public class TrainingBoxManager implements Listener {
     @EventHandler
     public void onBlockPlace(BlockPlaceEvent event) {
 
-        if(event.getBlock().getWorld()!=trainingWorld){
+        if (event.getBlock().getWorld() != trainingWorld) {
             return;
         }
 
         for (TrainingBox trainingBox : trainingBoxes) {
             if (trainingBox.isInBox(event.getBlock().getLocation())) {
-                if(!PrivateTraining.trainingBlocks.contains(event.getBlock().getType())){
+                if (!PrivateTraining.trainingBlocks.contains(event.getBlock().getType())) {
                     event.setCancelled(true);
                     return;
                 }
@@ -139,7 +132,6 @@ public class TrainingBoxManager implements Listener {
             }
         }
     }
-
 
 
 }
